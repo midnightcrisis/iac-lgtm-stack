@@ -1,0 +1,59 @@
+---
+- name: Install Nginx
+  apt:
+    name:
+      - nginx
+      - certbot
+      - python3-certbot-nginx
+    state: present
+
+- name: Create Nginx configuration for Semaphore
+  template:
+    src: semaphore-nginx.conf.j2
+    dest: /etc/nginx/sites-available/semaphore
+    mode: '0644'
+  notify: reload nginx
+
+- name: Enable Semaphore site
+  file:
+    src: /etc/nginx/sites-available/semaphore
+    dest: /etc/nginx/sites-enabled/semaphore
+    state: link
+  notify: reload nginx
+
+- name: Remove default Nginx site
+  file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  notify: reload nginx
+
+- name: Test Nginx configuration
+  command: nginx -t
+  changed_when: false
+
+- name: Start and enable Nginx
+  systemd:
+    name: nginx
+    state: started
+    enabled: yes
+
+- name: Generate SSL certificate with Certbot
+  command: >
+    certbot certonly --nginx
+    --non-interactive
+    --agree-tos
+    --email {{ ssl_email }}
+    --domains {{ hostname }}
+    --keep-until-expiring
+  when: enable_ssl | default(false)
+  register: certbot_result
+  failed_when: false
+
+- name: Setup SSL certificate renewal
+  cron:
+    name: "Renew Semaphore SSL certificate"
+    job: "certbot renew --quiet --no-self-upgrade --post-hook 'systemctl reload nginx'"
+    hour: "3"
+    minute: "30"
+    weekday: "1"
+  when: enable_ssl | default(false)

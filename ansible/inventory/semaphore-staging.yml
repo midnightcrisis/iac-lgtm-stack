@@ -1,0 +1,69 @@
+all:
+  hosts:
+    semaphore-staging:
+      ansible_host: 34.87.184.134  # Your staging server
+      ansible_user: root
+      ansible_ssh_private_key_file: ~/.ssh/id_rsa
+      hostname: stg-semaphore.checkinplus.com
+      
+  vars:
+    environment: staging
+    
+    # Semaphore configuration
+    semaphore_version: "2.9.37"
+    semaphore_port: 3001
+    semaphore_interface: "0.0.0.0"
+    semaphore_web_host: "https://stg-semaphore.checkinplus.com"
+    
+    # Database configuration (using PostgreSQL)
+    semaphore_db_type: postgres
+    semaphore_db_host: localhost
+    semaphore_db_port: 5432
+    semaphore_db_name: semaphore_staging
+    semaphore_db_user: semaphore_stg
+    semaphore_db_password: "{{ vault_semaphore_db_password }}"
+    semaphore_db_sslmode: disable
+    semaphore_manage_db: true
+    semaphore_db_admin_user: postgres
+    semaphore_db_admin_password: "{{ vault_postgres_admin_password | default('') }}"
+    
+    # Admin configuration
+    semaphore_admin_user: admin
+    semaphore_admin_name: "Staging Administrator"
+    semaphore_admin_email: "admin@checkinplus.com"
+    semaphore_admin_password: "{{ vault_semaphore_admin_password }}"
+    
+    # Staging settings
+    semaphore_max_parallel_tasks: 10
+    semaphore_max_tasks_per_template: 5
+    semaphore_concurrency_mode: "project"
+    semaphore_demo_mode: false
+    
+    # Email configuration (optional)
+    semaphore_email_alert: true
+    semaphore_email_sender: "semaphore@checkinplus.com"
+    semaphore_email_host: "smtp.gmail.com"
+    semaphore_email_port: "587"
+    semaphore_email_username: "{{ vault_email_username | default('') }}"
+    semaphore_email_password: "{{ vault_email_password | default('') }}"
+    semaphore_email_secure: true
+    
+    # Slack configuration (optional)
+    semaphore_slack_alert: false
+    semaphore_slack_url: "{{ vault_slack_webhook_url | default('') }}"
+    
+    # LDAP configuration (optional)
+    semaphore_ldap_enable: false
+    
+    # Ansible settings
+    semaphore_ansible_host_key_checking: false
+    semaphore_ansible_stdout_callback: "yaml"
+    
+    # System limits
+    semaphore_nofile_limit: 65536
+    semaphore_nproc_limit: 32768
+    
+    # SSL/Nginx configuration
+    enable_ssl: true
+    ssl_email: admin@checkinplus.com
+    configure_nginx_proxy: true

@@ -1,0 +1,92 @@
+---
+- name: Create Prometheus directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ lgtm_user }}"
+    group: "{{ lgtm_group }}"
+    mode: '0755'
+  loop:
+    - "{{ prometheus_data_dir }}"
+    - "{{ prometheus_config_dir }}"
+    - "{{ prometheus_config_dir }}/rules"
+    - "{{ prometheus_config_dir }}/file_sd"
+    - "{{ lgtm_base_dir }}/prometheus"
+
+- name: Download and extract Prometheus
+  unarchive:
+    src: "https://github.com/prometheus/prometheus/releases/download/v{{ prometheus_version }}/prometheus-{{ prometheus_version }}.linux-amd64.tar.gz"
+    dest: /tmp
+    remote_src: yes
+    creates: "/tmp/prometheus-{{ prometheus_version }}.linux-amd64"
+
+- name: Copy Prometheus binaries
+  copy:
+    src: "/tmp/prometheus-{{ prometheus_version }}.linux-amd64/{{ item }}"
+    dest: "{{ lgtm_base_dir }}/bin/{{ item }}"
+    owner: "{{ lgtm_user }}"
+    group: "{{ lgtm_group }}"
+    mode: '0755'
+    remote_src: yes
+  loop:
+    - prometheus
+    - promtool
+
+- name: Copy console libraries
+  copy:
+    src: "/tmp/prometheus-{{ prometheus_version }}.linux-amd64/{{ item }}"
+    dest: "{{ prometheus_config_dir }}/"
+    owner: "{{ lgtm_user }}"
+    group: "{{ lgtm_group }}"
+    remote_src: yes
+  loop:
+    - consoles
+    - console_libraries
+
+- name: Create Prometheus configuration
+  template:
+    src: prometheus.yml.j2
+    dest: "{{ prometheus_config_dir }}/prometheus.yml"
+    owner: "{{ lgtm_user }}"
+    group: "{{ lgtm_group }}"
+    mode: '0644'
+  notify: restart prometheus
+
+- name: Create Prometheus alerting rules
+  template:
+    src: alerting_rules.yml.j2
+    dest: "{{ prometheus_config_dir }}/rules/alerting_rules.yml"
+    owner: "{{ lgtm_user }}"
+    group: "{{ lgtm_group }}"
+    mode: '0644'
+  notify: reload prometheus
+
+- name: Create Prometheus systemd service
+  template:
+    src: prometheus.service.j2
+    dest: /etc/systemd/system/prometheus.service
+    mode: '0644'
+  notify:
+    - reload systemd
+    - restart prometheus
+
+- name: Create Prometheus web config for basic auth (optional)
+  template:
+    src: web.yml.j2
+    dest: "{{ prometheus_config_dir }}/web.yml"
+    owner: "{{ lgtm_user }}"
+    group: "{{ lgtm_group }}"
+    mode: '0600'
+  when: prometheus_enable_auth | default(false)
+
+- name: Validate Prometheus configuration
+  command: "{{ lgtm_base_dir }}/bin/promtool check config {{ prometheus_config_dir }}/prometheus.yml"
+  changed_when: false
+  check_mode: no
+
+- name: Start and enable Prometheus
+  systemd:
+    name: prometheus
+    state: started
+    enabled: yes
+    daemon_reload: yes

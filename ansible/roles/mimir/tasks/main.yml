@@ -1,0 +1,56 @@
+---
+- name: Create Mimir directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ lgtm_user }}"
+    group: "{{ lgtm_group }}"
+    mode: '0755'
+  loop:
+    - "{{ mimir_data_dir }}"
+    - "{{ mimir_data_dir }}/tsdb"
+    - "{{ mimir_data_dir }}/compactor"
+    - "{{ mimir_data_dir }}/ruler"
+    - "{{ mimir_config_dir }}"
+    - "{{ lgtm_base_dir }}/mimir"
+
+- name: Download Mimir binary
+  get_url:
+    url: "https://github.com/grafana/mimir/releases/download/mimir-{{ mimir_version }}/mimir-linux-amd64"
+    dest: "{{ lgtm_base_dir }}/bin/mimir"
+    owner: "{{ lgtm_user }}"
+    group: "{{ lgtm_group }}"
+    mode: '0755'
+
+- name: Download Mimirtool binary
+  get_url:
+    url: "https://github.com/grafana/mimir/releases/download/mimir-{{ mimir_version }}/mimirtool-linux-amd64"
+    dest: "{{ lgtm_base_dir }}/bin/mimirtool"
+    owner: "{{ lgtm_user }}"
+    group: "{{ lgtm_group }}"
+    mode: '0755'
+
+- name: Create Mimir configuration
+  template:
+    src: mimir-config.yml.j2
+    dest: "{{ mimir_config_dir }}/mimir-config.yml"
+    owner: "{{ lgtm_user }}"
+    group: "{{ lgtm_group }}"
+    mode: '0644'
+  notify: restart mimir
+
+- name: Create Mimir systemd service
+  template:
+    src: mimir.service.j2
+    dest: /etc/systemd/system/mimir.service
+    mode: '0644'
+  notify:
+    - reload systemd
+    - restart mimir
+
+- name: Start and enable Mimir
+  systemd:
+    name: mimir
+    state: started
+    enabled: yes
+    daemon_reload: yes

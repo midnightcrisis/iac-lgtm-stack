@@ -1,0 +1,15 @@
+---
+- name: reload systemd
+  systemd:
+    daemon_reload: yes
+
+- name: restart otelcol
+  systemd:
+    name: otelcol
+    state: restarted
+    enabled: yes
+
+- name: reload otelcol
+  systemd:
+    name: otelcol
+    state: reloaded

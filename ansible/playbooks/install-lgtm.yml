@@ -1,0 +1,127 @@
+---
+- name: Install LGTM Stack (Native) on Ubuntu 22.04
+  hosts: all
+  become: true
+  
+  pre_tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+    
+    - name: Install required system packages
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - wget
+          - software-properties-common
+          - gnupg
+          - lsb-release
+          - python3-pip
+          - jq
+          - nginx
+          - certbot
+          - python3-certbot-nginx
+          - unzip
+          - tar
+          - gzip
+          - systemd
+          - rsyslog
+          - logrotate
+          - ufw
+        state: present
+    
+    - name: Create LGTM system user
+      user:
+        name: "{{ lgtm_user }}"
+        group: "{{ lgtm_group }}"
+        system: yes
+        shell: /bin/false
+        home: "{{ lgtm_base_dir }}"
+        create_home: yes
+        state: present
+    
+    - name: Create LGTM base directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ lgtm_user }}"
+        group: "{{ lgtm_group }}"
+        mode: '0755'
+      loop:
+        - "{{ lgtm_base_dir }}"
+        - "{{ lgtm_base_dir }}/bin"
+        - "{{ lgtm_base_dir }}/config"
+        - "{{ lgtm_base_dir }}/data"
+        - /var/log/lgtm
+    
+    - name: Set system limits
+      pam_limits:
+        domain: "{{ lgtm_user }}"
+        limit_type: "{{ item.type }}"
+        limit_item: "{{ item.item }}"
+        value: "{{ item.value }}"
+      loop:
+        - { type: 'soft', item: 'nofile', value: "{{ nofile_limit }}" }
+        - { type: 'hard', item: 'nofile', value: "{{ nofile_limit }}" }
+        - { type: 'soft', item: 'nproc', value: "{{ nproc_limit }}" }
+        - { type: 'hard', item: 'nproc', value: "{{ nproc_limit }}" }
+  
+  roles:
+    - common
+    - prometheus
+    - loki
+    - tempo
+    - mimir
+    - grafana
+    - opentelemetry
+    - nginx-proxy
+    - ssl-certbot
+    
+  post_tasks:
+    - name: Ensure all services are started and enabled
+      systemd:
+        name: "{{ item }}"
+        state: started
+        enabled: yes
+        daemon_reload: yes
+      loop:
+        - prometheus
+        - loki
+        - tempo
+        - mimir
+        - grafana-server
+        - nginx
+    
+    - name: Wait for services to be ready
+      uri:
+        url: "http://localhost:{{ item.port }}{{ item.path }}"
+        status_code: [200, 302, 401]
+      retries: 30
+      delay: 10
+      loop:
+        - { service: "Grafana", port: "{{ grafana_port }}", path: "/login" }
+        - { service: "Loki", port: "{{ loki_port }}", path: "/ready" }
+        - { service: "Tempo", port: "{{ tempo_port }}", path: "/ready" }
+        - { service: "Mimir", port: "{{ mimir_port }}", path: "/ready" }
+        - { service: "Prometheus", port: "{{ prometheus_port }}", path: "/-/ready" }
+    
+    - name: Display access information
+      debug:
+        msg:
+          - "========================================"
+          - "LGTM Stack installed successfully!"
+          - "========================================"
+          - "Grafana URL: https://{{ grafana_domain }}"
+          - "Username: {{ grafana_admin_user }}"
+          - "Password: [Check vault or secrets]"
+          - "========================================"
+          - "Service Ports:"
+          - "  - Prometheus: {{ prometheus_port }}"
+          - "  - Loki: {{ loki_port }}"
+          - "  - Tempo: {{ tempo_port }}"
+          - "  - Mimir: {{ mimir_port }}"
+          - "  - Grafana: {{ grafana_port }}"
+          - "========================================"

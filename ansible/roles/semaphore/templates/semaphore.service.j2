@@ -1,0 +1,37 @@
+[Unit]
+Description=Semaphore Ansible UI
+Documentation=https://docs.ansible-semaphore.com/
+After=network-online.target {{ 'postgresql.service' if semaphore_db_type == 'postgres' else 'mariadb.service' if semaphore_db_type == 'mysql' else '' }}
+Wants=network-online.target
+
+[Service]
+Type=simple
+User={{ semaphore_user }}
+Group={{ semaphore_group }}
+WorkingDirectory={{ semaphore_home }}
+EnvironmentFile={{ semaphore_home }}/config/semaphore.env
+ExecStart={{ semaphore_home }}/bin/semaphore server --config {{ semaphore_home }}/config/config.json
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+RestartSec=10
+
+# Logging
+StandardOutput=append:/var/log/semaphore/semaphore.log
+StandardError=append:/var/log/semaphore/semaphore-error.log
+SyslogIdentifier=semaphore
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths={{ semaphore_home }} /var/log/semaphore
+
+# Resource limits
+LimitNOFILE={{ semaphore_nofile_limit | default(65536) }}
+LimitNPROC={{ semaphore_nproc_limit | default(32768) }}
+TimeoutStartSec=300
+TimeoutStopSec=300
+
+[Install]
+WantedBy=multi-user.target

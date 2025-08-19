@@ -1,0 +1,91 @@
+all:
+  hosts:
+    semaphore-prod:
+      ansible_host: 10.0.1.100  # Replace with your production server IP
+      ansible_user: ubuntu
+      ansible_ssh_private_key_file: ~/.ssh/prod_key.pem
+      ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
+      hostname: semaphore.example.com
+      
+  vars:
+    environment: production
+    
+    # Semaphore configuration
+    semaphore_version: "2.9.37"
+    semaphore_port: 3001
+    semaphore_interface: "127.0.0.1"  # Only listen on localhost in prod
+    semaphore_web_host: "https://semaphore.example.com"
+    
+    # Database configuration (using external PostgreSQL)
+    semaphore_db_type: postgres
+    semaphore_db_host: "db.example.com"  # External database
+    semaphore_db_port: 5432
+    semaphore_db_name: semaphore_prod
+    semaphore_db_user: semaphore_prod
+    semaphore_db_password: "{{ vault_semaphore_db_password }}"
+    semaphore_db_sslmode: require  # Enable SSL for production
+    semaphore_manage_db: false  # Don't manage external DB
+    
+    # Admin configuration
+    semaphore_admin_user: admin
+    semaphore_admin_name: "Production Administrator"
+    semaphore_admin_email: "sysadmin@example.com"
+    semaphore_admin_password: "{{ vault_semaphore_admin_password }}"
+    
+    # Production settings
+    semaphore_max_parallel_tasks: 20
+    semaphore_max_tasks_per_template: 10
+    semaphore_concurrency_mode: "node"
+    semaphore_demo_mode: false
+    semaphore_non_admin_can_create_project: false
+    
+    # Email configuration
+    semaphore_email_alert: true
+    semaphore_email_sender: "semaphore@example.com"
+    semaphore_email_host: "smtp.example.com"
+    semaphore_email_port: "587"
+    semaphore_email_username: "{{ vault_email_username }}"
+    semaphore_email_password: "{{ vault_email_password }}"
+    semaphore_email_secure: true
+    
+    # Slack configuration
+    semaphore_slack_alert: true
+    semaphore_slack_url: "{{ vault_slack_webhook_url }}"
+    
+    # Telegram configuration
+    semaphore_telegram_alert: true
+    semaphore_telegram_chat: "{{ vault_telegram_chat_id }}"
+    semaphore_telegram_token: "{{ vault_telegram_bot_token }}"
+    
+    # LDAP configuration
+    semaphore_ldap_enable: true
+    semaphore_ldap_binddn: "cn=admin,dc=example,dc=com"
+    semaphore_ldap_bindpassword: "{{ vault_ldap_bind_password }}"
+    semaphore_ldap_server: "ldap://ldap.example.com:389"
+    semaphore_ldap_searchdn: "ou=users,dc=example,dc=com"
+    semaphore_ldap_searchfilter: "(&(objectClass=inetOrgPerson)(uid=%s))"
+    semaphore_ldap_mapping_dn: "dn"
+    semaphore_ldap_mapping_mail: "mail"
+    semaphore_ldap_mapping_uid: "uid"
+    semaphore_ldap_mapping_cn: "cn"
+    semaphore_ldap_needtls: true
+    
+    # Ansible settings
+    semaphore_ansible_host_key_checking: true  # Enable for production
+    semaphore_ansible_stdout_callback: "json"
+    
+    # Runner configuration (for distributed execution)
+    semaphore_use_remote_runner: true
+    semaphore_runner_api_url: "https://semaphore-runner.example.com"
+    semaphore_runner_registration_token: "{{ vault_runner_registration_token }}"
+    semaphore_runner_max_parallel_tasks: 5
+    semaphore_runner_job_lifetime: 1440
+    
+    # System limits
+    semaphore_nofile_limit: 131072
+    semaphore_nproc_limit: 65536
+    
+    # SSL/Nginx configuration
+    enable_ssl: true
+    ssl_email: sysadmin@example.com
+    configure_nginx_proxy: true

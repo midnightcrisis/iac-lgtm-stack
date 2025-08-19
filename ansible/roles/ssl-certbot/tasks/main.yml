@@ -1,0 +1,98 @@
+---
+- name: Install Certbot and dependencies
+  apt:
+    name:
+      - certbot
+      - python3-certbot-nginx
+    state: present
+    update_cache: yes
+
+- name: Check if SSL certificate exists
+  stat:
+    path: "/etc/letsencrypt/live/{{ grafana_domain }}/fullchain.pem"
+  register: ssl_cert
+
+- name: Stop Nginx for initial certificate generation
+  systemd:
+    name: nginx
+    state: stopped
+  when: not ssl_cert.stat.exists and enable_ssl
+
+- name: Generate SSL certificate with Certbot (standalone mode)
+  command: >
+    certbot certonly --standalone
+    --non-interactive
+    --agree-tos
+    --email {{ ssl_email }}
+    --domains {{ grafana_domain }}
+    --keep-until-expiring
+    --expand
+  when: not ssl_cert.stat.exists and enable_ssl
+  register: certbot_result
+
+- name: Start Nginx after certificate generation
+  systemd:
+    name: nginx
+    state: started
+  when: not ssl_cert.stat.exists and enable_ssl
+
+- name: Generate SSL certificate with Certbot (nginx mode) - for renewal
+  command: >
+    certbot certonly --nginx
+    --non-interactive
+    --agree-tos
+    --email {{ ssl_email }}
+    --domains {{ grafana_domain }}
+    --keep-until-expiring
+    --expand
+  when: ssl_cert.stat.exists and enable_ssl
+  changed_when: false
+
+- name: Create self-signed certificate for testing (if SSL disabled)
+  block:
+    - name: Create SSL directory
+      file:
+        path: "/etc/letsencrypt/live/{{ grafana_domain }}"
+        state: directory
+        mode: '0755'
+
+    - name: Generate self-signed certificate
+      command: >
+        openssl req -x509 -nodes -days 365 -newkey rsa:2048
+        -keyout /etc/letsencrypt/live/{{ grafana_domain }}/privkey.pem
+        -out /etc/letsencrypt/live/{{ grafana_domain }}/fullchain.pem
+        -subj "/C=US/ST=State/L=City/O=Organization/CN={{ grafana_domain }}"
+      args:
+        creates: "/etc/letsencrypt/live/{{ grafana_domain }}/fullchain.pem"
+  when: not enable_ssl
+
+- name: Set up automatic certificate renewal
+  cron:
+    name: "Renew Let's Encrypt certificates"
+    job: "certbot renew --quiet --no-self-upgrade --post-hook 'systemctl reload nginx'"
+    hour: "3"
+    minute: "30"
+    weekday: "1"
+  when: enable_ssl
+
+- name: Create certificate renewal timer (systemd)
+  template:
+    src: certbot-renewal.timer.j2
+    dest: /etc/systemd/system/certbot-renewal.timer
+    mode: '0644'
+  when: enable_ssl
+
+- name: Create certificate renewal service (systemd)
+  template:
+    src: certbot-renewal.service.j2
+    dest: /etc/systemd/system/certbot-renewal.service
+    mode: '0644'
+  when: enable_ssl
+
+- name: Enable and start renewal timer
+  systemd:
+    name: certbot-renewal.timer
+    state: started
+    enabled: yes
+    daemon_reload: yes
+  when: enable_ssl

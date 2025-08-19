@@ -1,0 +1,87 @@
+all:
+  hosts:
+    rizzup-monitor:
+      ansible_host: 34.87.184.134
+      ansible_user: root
+      ansible_ssh_private_key_file: ~/.ssh/id_rsa
+      hostname: stg-checkinplust-monitor.checkinplus.com
+      environment: staging
+      
+  vars:
+    # Base configuration
+    lgtm_base_dir: /opt/lgtm
+    lgtm_user: lgtm
+    lgtm_group: lgtm
+    data_retention_days: 30
+    
+    # Domain and SSL
+    grafana_domain: stg-checkinplust-monitor.checkinplus.com
+    ssl_email: admin@checkinplus.com
+    enable_ssl: true
+    
+    # Grafana configuration
+    grafana_version: 10.2.3
+    grafana_port: 3000
+    grafana_admin_user: admin
+    grafana_admin_password: "{{ vault_grafana_admin_password }}"
+    grafana_data_dir: "{{ lgtm_base_dir }}/grafana/data"
+    grafana_logs_dir: /var/log/grafana
+    grafana_plugins:
+      - grafana-piechart-panel
+      - redis-datasource
+      - grafana-googlesheets-datasource
+    
+    # Prometheus configuration
+    prometheus_version: 2.48.0
+    prometheus_port: 9090
+    prometheus_data_dir: "{{ lgtm_base_dir }}/prometheus/data"
+    prometheus_config_dir: /etc/prometheus
+    prometheus_retention_time: "{{ data_retention_days }}d"
+    prometheus_retention_size: 50GB
+    
+    # Loki configuration
+    loki_version: 2.9.3
+    loki_port: 3100
+    loki_data_dir: "{{ lgtm_base_dir }}/loki/data"
+    loki_config_dir: /etc/loki
+    loki_retention_period: "{{ data_retention_days }}d"
+    loki_ingestion_rate_mb: 100
+    loki_ingestion_burst_mb: 200
+    
+    # Tempo configuration
+    tempo_version: 2.3.1
+    tempo_port: 3200
+    tempo_otlp_grpc_port: 4317
+    tempo_otlp_http_port: 4318
+    tempo_jaeger_port: 14268
+    tempo_zipkin_port: 9411
+    tempo_data_dir: "{{ lgtm_base_dir }}/tempo/data"
+    tempo_config_dir: /etc/tempo
+    
+    # Mimir configuration
+    mimir_version: 2.11.0
+    mimir_port: 9009
+    mimir_data_dir: "{{ lgtm_base_dir }}/mimir/data"
+    mimir_config_dir: /etc/mimir
+    
+    # Nginx configuration
+    nginx_worker_processes: auto
+    nginx_worker_connections: 1024
+    nginx_client_max_body_size: 100m
+    nginx_proxy_read_timeout: 600
+    nginx_proxy_connect_timeout: 600
+    nginx_proxy_send_timeout: 600
+    
+    # System limits
+    nofile_limit: 65536
+    nproc_limit: 32768
+    
+    # GKE cluster configuration (for remote scraping)
+    gke_cluster_name: checkinplus-staging
+    gke_region: asia-southeast1
+    gke_project: checkinplus-staging
+    monitored_namespaces:
+      - frontend
+      - backend
+      - ingress
+      - monitoring

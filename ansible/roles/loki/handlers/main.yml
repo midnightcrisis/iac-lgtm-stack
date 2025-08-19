@@ -1,0 +1,15 @@
+---
+- name: reload systemd
+  systemd:
+    daemon_reload: yes
+
+- name: restart loki
+  systemd:
+    name: loki
+    state: restarted
+    enabled: yes
+
+- name: reload loki
+  systemd:
+    name: loki
+    state: reloaded

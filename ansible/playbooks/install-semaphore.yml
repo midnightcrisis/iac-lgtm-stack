@@ -1,0 +1,115 @@
+---
+- name: Install Semaphore Ansible UI
+  hosts: all
+  become: true
+  
+  pre_tasks:
+    - name: Display installation information
+      debug:
+        msg:
+          - "========================================="
+          - "Installing Semaphore for environment: {{ environment }}"
+          - "Target host: {{ ansible_host }}"
+          - "Semaphore version: {{ semaphore_version }}"
+          - "Database type: {{ semaphore_db_type }}"
+          - "========================================="
+    
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+    
+    - name: Install PostgreSQL (if using local postgres)
+      block:
+        - name: Install PostgreSQL server
+          apt:
+            name:
+              - postgresql
+              - postgresql-contrib
+              - postgresql-client
+              - python3-psycopg2
+            state: present
+        
+        - name: Start PostgreSQL service
+          systemd:
+            name: postgresql
+            state: started
+            enabled: yes
+        
+        - name: Set PostgreSQL admin password
+          become_user: postgres
+          postgresql_user:
+            name: postgres
+            password: "{{ semaphore_db_admin_password | default('postgres') }}"
+          when: semaphore_db_admin_password is defined and semaphore_db_admin_password != ''
+      when: 
+        - semaphore_db_type == 'postgres'
+        - semaphore_db_host in ['localhost', '127.0.0.1']
+        - semaphore_manage_db | default(true)
+    
+    - name: Install MariaDB (if using local mysql)
+      block:
+        - name: Install MariaDB server
+          apt:
+            name:
+              - mariadb-server
+              - mariadb-client
+              - python3-mysqldb
+            state: present
+        
+        - name: Start MariaDB service
+          systemd:
+            name: mariadb
+            state: started
+            enabled: yes
+        
+        - name: Secure MariaDB installation
+          mysql_user:
+            name: root
+            password: "{{ semaphore_db_admin_password | default('root') }}"
+            login_unix_socket: /var/run/mysqld/mysqld.sock
+            host_all: yes
+          when: semaphore_db_admin_password is defined and semaphore_db_admin_password != ''
+      when:
+        - semaphore_db_type == 'mysql'
+        - semaphore_db_host in ['localhost', '127.0.0.1']
+        - semaphore_manage_db | default(true)
+  
+  roles:
+    - semaphore
+    - role: semaphore-nginx
+      when: configure_nginx_proxy | default(false)
+  
+  post_tasks:
+    - name: Check Semaphore service status
+      systemd:
+        name: semaphore
+      register: semaphore_status
+    
+    - name: Display Semaphore status
+      debug:
+        msg: "Semaphore service is {{ semaphore_status.status.ActiveState }}"
+    
+    - name: Display access information
+      debug:
+        msg:
+          - "========================================="
+          - "Semaphore installation completed!"
+          - "========================================="
+          - "Web Interface: {{ semaphore_web_host | default('http://' + ansible_host + ':' + semaphore_port|string) }}"
+          - "Admin Username: {{ semaphore_admin_user }}"
+          - "Admin Password: [Check vault or use the one provided]"
+          - "========================================="
+          - "API Endpoint: {{ semaphore_web_host | default('http://' + ansible_host + ':' + semaphore_port|string) }}/api"
+          - "========================================="
+    
+    - name: Test Semaphore API
+      uri:
+        url: "http://localhost:{{ semaphore_port }}/api/ping"
+        method: GET
+      register: api_test
+      failed_when: false
+    
+    - name: Display API test result
+      debug:
+        msg: "API Test: {{ 'SUCCESS' if api_test.status == 200 else 'FAILED' }}"

@@ -1,0 +1,34 @@
+[Unit]
+Description=OpenTelemetry Collector
+Documentation=https://opentelemetry.io/docs/collector/
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User={{ lgtm_user }}
+Group={{ lgtm_group }}
+ExecStart={{ lgtm_base_dir }}/bin/otelcol \
+  --config={{ otel_base_dir }}/config/otel-collector-config.yaml
+
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+RestartSec=5
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=otelcol
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths={{ otel_base_dir }} /var/log/otelcol
+
+# Resource limits
+LimitNOFILE={{ nofile_limit }}
+LimitNPROC={{ nproc_limit }}
+
+[Install]
+WantedBy=multi-user.target

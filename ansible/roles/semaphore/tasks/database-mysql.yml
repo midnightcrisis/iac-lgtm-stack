@@ -1,0 +1,36 @@
+---
+- name: Install MySQL/MariaDB client
+  apt:
+    name:
+      - mariadb-client
+      - python3-mysqldb
+    state: present
+
+- name: Create Semaphore database
+  mysql_db:
+    name: "{{ semaphore_db_name }}"
+    encoding: utf8mb4
+    collation: utf8mb4_unicode_ci
+    login_host: "{{ semaphore_db_host }}"
+    login_port: "{{ semaphore_db_port }}"
+    login_user: "{{ semaphore_db_admin_user | default('root') }}"
+    login_password: "{{ semaphore_db_admin_password | default(omit) }}"
+    state: present
+  when: semaphore_db_host == 'localhost' or semaphore_db_host == '127.0.0.1'
+
+- name: Create Semaphore database user
+  mysql_user:
+    name: "{{ semaphore_db_user }}"
+    password: "{{ semaphore_db_password }}"
+    priv: "{{ semaphore_db_name }}.*:ALL"
+    host: "{{ item }}"
+    login_host: "{{ semaphore_db_host }}"
+    login_port: "{{ semaphore_db_port }}"
+    login_user: "{{ semaphore_db_admin_user | default('root') }}"
+    login_password: "{{ semaphore_db_admin_password | default(omit) }}"
+    state: present
+  loop:
+    - localhost
+    - 127.0.0.1
+    - "%"
+  when: semaphore_db_host == 'localhost' or semaphore_db_host == '127.0.0.1'

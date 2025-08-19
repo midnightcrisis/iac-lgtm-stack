@@ -1,0 +1,179 @@
+---
+- name: Install Semaphore dependencies
+  apt:
+    name:
+      - git
+      - curl
+      - wget
+      - software-properties-common
+      - gnupg2
+      - python3-mysqldb
+      - python3-psycopg2
+      - mariadb-client
+      - postgresql-client
+      - sshpass
+    state: present
+    update_cache: yes
+
+- name: Create Semaphore user
+  user:
+    name: "{{ semaphore_user }}"
+    group: "{{ semaphore_group }}"
+    system: yes
+    shell: /bin/bash
+    home: "{{ semaphore_home }}"
+    create_home: yes
+    state: present
+
+- name: Create Semaphore directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ semaphore_user }}"
+    group: "{{ semaphore_group }}"
+    mode: '0755'
+  loop:
+    - "{{ semaphore_home }}"
+    - "{{ semaphore_home }}/bin"
+    - "{{ semaphore_home }}/config"
+    - "{{ semaphore_home }}/data"
+    - "{{ semaphore_home }}/logs"
+    - "{{ semaphore_home }}/tmp"
+    - "{{ semaphore_home }}/inventory"
+    - "{{ semaphore_home }}/playbooks"
+    - /var/log/semaphore
+
+- name: Check current Semaphore version
+  stat:
+    path: "{{ semaphore_home }}/bin/.version"
+  register: version_file
+
+- name: Read current version
+  slurp:
+    src: "{{ semaphore_home }}/bin/.version"
+  register: current_version
+  when: version_file.stat.exists
+
+- name: Download Semaphore binary
+  get_url:
+    url: "https://github.com/ansible-semaphore/semaphore/releases/download/v{{ semaphore_version }}/semaphore_{{ semaphore_version }}_linux_amd64.tar.gz"
+    dest: "/tmp/semaphore_{{ semaphore_version }}.tar.gz"
+    mode: '0644'
+  when: not version_file.stat.exists or (current_version.content | b64decode | trim != semaphore_version)
+
+- name: Extract Semaphore binary
+  unarchive:
+    src: "/tmp/semaphore_{{ semaphore_version }}.tar.gz"
+    dest: "{{ semaphore_home }}/bin"
+    owner: "{{ semaphore_user }}"
+    group: "{{ semaphore_group }}"
+    mode: '0755'
+    remote_src: yes
+  when: not version_file.stat.exists or (current_version.content | b64decode | trim != semaphore_version)
+  notify:
+    - restart semaphore
+
+- name: Save installed version
+  copy:
+    content: "{{ semaphore_version }}"
+    dest: "{{ semaphore_home }}/bin/.version"
+    owner: "{{ semaphore_user }}"
+    group: "{{ semaphore_group }}"
+    mode: '0644'
+
+- name: Set up database
+  include_tasks: "database-{{ semaphore_db_type }}.yml"
+  when: semaphore_manage_db | default(true)
+
+- name: Generate Semaphore configuration
+  template:
+    src: config.json.j2
+    dest: "{{ semaphore_home }}/config/config.json"
+    owner: "{{ semaphore_user }}"
+    group: "{{ semaphore_group }}"
+    mode: '0600'
+  notify:
+    - restart semaphore
+
+- name: Initialize Semaphore database
+  become_user: "{{ semaphore_user }}"
+  command: >
+    {{ semaphore_home }}/bin/semaphore migrate
+    --config {{ semaphore_home }}/config/config.json
+  args:
+    creates: "{{ semaphore_home }}/.db_initialized"
+  register: db_init
+
+- name: Mark database as initialized
+  file:
+    path: "{{ semaphore_home }}/.db_initialized"
+    state: touch
+    owner: "{{ semaphore_user }}"
+    group: "{{ semaphore_group }}"
+    mode: '0644'
+  when: db_init.changed
+
+- name: Create admin user
+  become_user: "{{ semaphore_user }}"
+  shell: |
+    {{ semaphore_home }}/bin/semaphore user add \
+      --config {{ semaphore_home }}/config/config.json \
+      --admin \
+      --login "{{ semaphore_admin_user }}" \
+      --name "{{ semaphore_admin_name }}" \
+      --email "{{ semaphore_admin_email }}" \
+      --password "{{ semaphore_admin_password }}"
+  args:
+    creates: "{{ semaphore_home }}/.admin_created"
+  register: admin_create
+  ignore_errors: yes
+
+- name: Mark admin as created
+  file:
+    path: "{{ semaphore_home }}/.admin_created"
+    state: touch
+    owner: "{{ semaphore_user }}"
+    group: "{{ semaphore_group }}"
+    mode: '0644'
+  when: admin_create.changed and admin_create.rc == 0
+
+- name: Create Semaphore systemd service
+  template:
+    src: semaphore.service.j2
+    dest: /etc/systemd/system/semaphore.service
+    mode: '0644'
+  notify:
+    - reload systemd
+    - restart semaphore
+
+- name: Create Semaphore environment file
+  template:
+    src: semaphore.env.j2
+    dest: "{{ semaphore_home }}/config/semaphore.env"
+    owner: "{{ semaphore_user }}"
+    group: "{{ semaphore_group }}"
+    mode: '0600'
+  notify:
+    - restart semaphore
+
+- name: Configure logrotate for Semaphore
+  template:
+    src: semaphore.logrotate.j2
+    dest: /etc/logrotate.d/semaphore
+    mode: '0644'
+
+- name: Start and enable Semaphore
+  systemd:
+    name: semaphore
+    state: started
+    enabled: yes
+    daemon_reload: yes
+
+- name: Wait for Semaphore to be ready
+  uri:
+    url: "http://localhost:{{ semaphore_port }}/api/ping"
+    status_code: 200
+  retries: 30
+  delay: 5
+  register: result
+  until: result.status == 200

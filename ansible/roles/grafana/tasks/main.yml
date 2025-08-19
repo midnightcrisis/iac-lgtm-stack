@@ -1,0 +1,110 @@
+---
+- name: Add Grafana GPG key
+  apt_key:
+    url: https://packages.grafana.com/gpg.key
+    state: present
+
+- name: Add Grafana repository
+  apt_repository:
+    repo: "deb https://packages.grafana.com/oss/deb stable main"
+    state: present
+    filename: grafana
+
+- name: Install Grafana
+  apt:
+    name: "grafana={{ grafana_version }}*"
+    state: present
+    update_cache: yes
+
+- name: Create Grafana directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: grafana
+    group: grafana
+    mode: '0755'
+  loop:
+    - "{{ grafana_data_dir }}"
+    - "{{ grafana_data_dir }}/plugins"
+    - "{{ grafana_logs_dir }}"
+    - /etc/grafana/provisioning
+    - /etc/grafana/provisioning/datasources
+    - /etc/grafana/provisioning/dashboards
+    - /etc/grafana/provisioning/notifiers
+    - /etc/grafana/provisioning/plugins
+    - /var/lib/grafana/dashboards
+
+- name: Configure Grafana
+  template:
+    src: grafana.ini.j2
+    dest: /etc/grafana/grafana.ini
+    owner: grafana
+    group: grafana
+    mode: '0640'
+  notify: restart grafana
+
+- name: Configure Grafana datasources
+  template:
+    src: datasources.yml.j2
+    dest: /etc/grafana/provisioning/datasources/lgtm.yml
+    owner: grafana
+    group: grafana
+    mode: '0644'
+  notify: restart grafana
+
+- name: Configure dashboard provisioning
+  template:
+    src: dashboards.yml.j2
+    dest: /etc/grafana/provisioning/dashboards/default.yml
+    owner: grafana
+    group: grafana
+    mode: '0644'
+  notify: restart grafana
+
+- name: Copy default dashboards
+  copy:
+    src: "{{ item }}"
+    dest: /var/lib/grafana/dashboards/
+    owner: grafana
+    group: grafana
+    mode: '0644'
+  with_fileglob:
+    - "dashboards/*.json"
+  notify: restart grafana
+
+- name: Install Grafana plugins
+  grafana_plugin:
+    name: "{{ item }}"
+    state: present
+  loop: "{{ grafana_plugins }}"
+  notify: restart grafana
+
+- name: Set Grafana admin password
+  lineinfile:
+    path: /etc/grafana/grafana.ini
+    regexp: '^admin_password ='
+    line: "admin_password = {{ grafana_admin_password }}"
+    state: present
+  notify: restart grafana
+
+- name: Create Grafana systemd override directory
+  file:
+    path: /etc/systemd/system/grafana-server.service.d
+    state: directory
+    mode: '0755'
+
+- name: Create Grafana systemd override
+  template:
+    src: grafana.service.override.j2
+    dest: /etc/systemd/system/grafana-server.service.d/override.conf
+    mode: '0644'
+  notify:
+    - reload systemd
+    - restart grafana
+
+- name: Start and enable Grafana
+  systemd:
+    name: grafana-server
+    state: started
+    enabled: yes
+    daemon_reload: yes

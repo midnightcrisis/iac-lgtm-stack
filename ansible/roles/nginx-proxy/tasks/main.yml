@@ -1,0 +1,92 @@
+---
+- name: Install Nginx and Certbot
+  apt:
+    name:
+      - nginx
+      - certbot
+      - python3-certbot-nginx
+    state: present
+    update_cache: yes
+
+- name: Remove default Nginx site
+  file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+
+- name: Create Nginx directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - /etc/nginx/ssl
+    - /etc/nginx/snippets
+    - /var/log/nginx
+
+- name: Generate DH parameters for SSL
+  openssl_dhparam:
+    path: /etc/nginx/ssl/dhparam.pem
+    size: 2048
+
+- name: Create Nginx SSL configuration snippet
+  template:
+    src: ssl-params.conf.j2
+    dest: /etc/nginx/snippets/ssl-params.conf
+    mode: '0644'
+  notify: reload nginx
+
+- name: Create Nginx proxy configuration for Grafana
+  template:
+    src: grafana-proxy.conf.j2
+    dest: /etc/nginx/sites-available/grafana
+    mode: '0644'
+  notify: reload nginx
+
+- name: Enable Grafana site
+  file:
+    src: /etc/nginx/sites-available/grafana
+    dest: /etc/nginx/sites-enabled/grafana
+    state: link
+  notify: reload nginx
+
+- name: Create additional proxy configurations for LGTM services
+  template:
+    src: "{{ item.template }}"
+    dest: "/etc/nginx/sites-available/{{ item.name }}"
+    mode: '0644'
+  loop:
+    - { name: 'prometheus', template: 'prometheus-proxy.conf.j2' }
+    - { name: 'loki', template: 'loki-proxy.conf.j2' }
+    - { name: 'tempo', template: 'tempo-proxy.conf.j2' }
+    - { name: 'mimir', template: 'mimir-proxy.conf.j2' }
+  when: expose_all_services | default(false)
+  notify: reload nginx
+
+- name: Create Nginx main configuration
+  template:
+    src: nginx.conf.j2
+    dest: /etc/nginx/nginx.conf
+    mode: '0644'
+    backup: yes
+  notify: reload nginx
+
+- name: Test Nginx configuration
+  command: nginx -t
+  changed_when: false
+  check_mode: no
+
+- name: Start and enable Nginx
+  systemd:
+    name: nginx
+    state: started
+    enabled: yes
+
+- name: Open firewall ports
+  ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop:
+    - '80'
+    - '443'
+  when: configure_firewall | default(true)

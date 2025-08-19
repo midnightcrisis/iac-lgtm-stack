@@ -1,0 +1,35 @@
+[Unit]
+Description=Grafana Mimir
+Documentation=https://grafana.com/docs/mimir/
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User={{ lgtm_user }}
+Group={{ lgtm_group }}
+ExecStart={{ lgtm_base_dir }}/bin/mimir \
+  -config.file={{ mimir_config_dir }}/mimir-config.yml \
+  -target=all
+
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+RestartSec=5
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mimir
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths={{ mimir_data_dir }} {{ mimir_config_dir }}
+
+# Resource limits
+LimitNOFILE={{ nofile_limit }}
+LimitNPROC={{ nproc_limit }}
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,67 @@
+---
+- name: Create Loki directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ lgtm_user }}"
+    group: "{{ lgtm_group }}"
+    mode: '0755'
+  loop:
+    - "{{ loki_data_dir }}"
+    - "{{ loki_data_dir }}/chunks"
+    - "{{ loki_data_dir }}/wal"
+    - "{{ loki_data_dir }}/rules"
+    - "{{ loki_config_dir }}"
+    - "{{ lgtm_base_dir }}/loki"
+
+- name: Download Loki binary
+  get_url:
+    url: "https://github.com/grafana/loki/releases/download/v{{ loki_version }}/loki-linux-amd64.zip"
+    dest: /tmp/loki-linux-amd64.zip
+    mode: '0644'
+
+- name: Extract Loki binary
+  unarchive:
+    src: /tmp/loki-linux-amd64.zip
+    dest: "{{ lgtm_base_dir }}/bin"
+    owner: "{{ lgtm_user }}"
+    group: "{{ lgtm_group }}"
+    mode: '0755'
+    remote_src: yes
+    creates: "{{ lgtm_base_dir }}/bin/loki-linux-amd64"
+
+- name: Rename Loki binary
+  command: mv {{ lgtm_base_dir }}/bin/loki-linux-amd64 {{ lgtm_base_dir }}/bin/loki
+  args:
+    creates: "{{ lgtm_base_dir }}/bin/loki"
+
+- name: Create Loki configuration
+  template:
+    src: loki-config.yml.j2
+    dest: "{{ loki_config_dir }}/loki-config.yml"
+    owner: "{{ lgtm_user }}"
+    group: "{{ lgtm_group }}"
+    mode: '0644'
+  notify: restart loki
+
+- name: Create Loki systemd service
+  template:
+    src: loki.service.j2
+    dest: /etc/systemd/system/loki.service
+    mode: '0644'
+  notify:
+    - reload systemd
+    - restart loki
+
+- name: Create Loki logrotate configuration
+  template:
+    src: loki.logrotate.j2
+    dest: /etc/logrotate.d/loki
+    mode: '0644'
+
+- name: Start and enable Loki
+  systemd:
+    name: loki
+    state: started
+    enabled: yes
+    daemon_reload: yes

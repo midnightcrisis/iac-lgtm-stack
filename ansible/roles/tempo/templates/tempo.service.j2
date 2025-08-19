@@ -1,0 +1,35 @@
+[Unit]
+Description=Grafana Tempo
+Documentation=https://grafana.com/docs/tempo/
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User={{ lgtm_user }}
+Group={{ lgtm_group }}
+ExecStart={{ lgtm_base_dir }}/bin/tempo \
+  -config.file={{ tempo_config_dir }}/tempo-config.yml \
+  -target=all
+
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+RestartSec=5
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=tempo
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths={{ tempo_data_dir }} {{ tempo_config_dir }}
+
+# Resource limits
+LimitNOFILE={{ nofile_limit }}
+LimitNPROC={{ nproc_limit }}
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,56 @@
+---
+- name: Create Tempo directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ lgtm_user }}"
+    group: "{{ lgtm_group }}"
+    mode: '0755'
+  loop:
+    - "{{ tempo_data_dir }}"
+    - "{{ tempo_data_dir }}/blocks"
+    - "{{ tempo_data_dir }}/wal"
+    - "{{ tempo_data_dir }}/generator"
+    - "{{ tempo_config_dir }}"
+    - "{{ lgtm_base_dir }}/tempo"
+
+- name: Download Tempo binary
+  get_url:
+    url: "https://github.com/grafana/tempo/releases/download/v{{ tempo_version }}/tempo_{{ tempo_version }}_linux_amd64.tar.gz"
+    dest: /tmp/tempo_{{ tempo_version }}_linux_amd64.tar.gz
+    mode: '0644'
+
+- name: Extract Tempo binary
+  unarchive:
+    src: /tmp/tempo_{{ tempo_version }}_linux_amd64.tar.gz
+    dest: "{{ lgtm_base_dir }}/bin"
+    owner: "{{ lgtm_user }}"
+    group: "{{ lgtm_group }}"
+    mode: '0755'
+    remote_src: yes
+    creates: "{{ lgtm_base_dir }}/bin/tempo"
+
+- name: Create Tempo configuration
+  template:
+    src: tempo-config.yml.j2
+    dest: "{{ tempo_config_dir }}/tempo-config.yml"
+    owner: "{{ lgtm_user }}"
+    group: "{{ lgtm_group }}"
+    mode: '0644'
+  notify: restart tempo
+
+- name: Create Tempo systemd service
+  template:
+    src: tempo.service.j2
+    dest: /etc/systemd/system/tempo.service
+    mode: '0644'
+  notify:
+    - reload systemd
+    - restart tempo
+
+- name: Start and enable Tempo
+  systemd:
+    name: tempo
+    state: started
+    enabled: yes
+    daemon_reload: yes

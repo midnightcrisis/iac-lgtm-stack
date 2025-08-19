@@ -1,0 +1,96 @@
+---
+# Semaphore version
+semaphore_version: "2.9.37"
+
+# Semaphore user and directories
+semaphore_user: semaphore
+semaphore_group: semaphore
+semaphore_home: /opt/semaphore
+
+# Semaphore web interface
+semaphore_port: 3001
+semaphore_interface: "0.0.0.0"
+semaphore_web_host: ""
+
+# Database configuration
+semaphore_db_type: postgres  # Options: postgres, mysql, bolt
+semaphore_db_host: localhost
+semaphore_db_port: 5432  # 5432 for postgres, 3306 for mysql
+semaphore_db_name: semaphore
+semaphore_db_user: semaphore
+semaphore_db_password: "{{ vault_semaphore_db_password | default('changeme') }}"
+semaphore_db_sslmode: disable
+semaphore_manage_db: true
+semaphore_db_admin_user: postgres  # or root for mysql
+semaphore_db_admin_password: ""
+
+# Admin user configuration
+semaphore_admin_user: admin
+semaphore_admin_name: "Administrator"
+semaphore_admin_email: "admin@example.com"
+semaphore_admin_password: "{{ vault_semaphore_admin_password | default('changeme') }}"
+
+# Security keys (will be auto-generated if not provided)
+semaphore_cookie_hash: ""
+semaphore_cookie_encryption: ""
+semaphore_access_key_encryption: ""
+
+# Email configuration
+semaphore_email_alert: false
+semaphore_email_sender: ""
+semaphore_email_host: ""
+semaphore_email_port: ""
+semaphore_email_username: ""
+semaphore_email_password: ""
+semaphore_email_secure: false
+
+# Telegram configuration
+semaphore_telegram_alert: false
+semaphore_telegram_chat: ""
+semaphore_telegram_token: ""
+
+# Slack configuration
+semaphore_slack_alert: false
+semaphore_slack_url: ""
+
+# LDAP configuration
+semaphore_ldap_enable: false
+semaphore_ldap_binddn: ""
+semaphore_ldap_bindpassword: ""
+semaphore_ldap_server: ""
+semaphore_ldap_searchdn: ""
+semaphore_ldap_searchfilter: "(&(objectClass=person)(uid=%s))"
+semaphore_ldap_mapping_dn: "dn"
+semaphore_ldap_mapping_mail: "mail"
+semaphore_ldap_mapping_uid: "uid"
+semaphore_ldap_mapping_cn: "cn"
+semaphore_ldap_needtls: false
+
+# Task execution settings
+semaphore_max_parallel_tasks: 10
+semaphore_max_tasks_per_template: 5
+semaphore_concurrency_mode: "project"  # Options: project, node, none
+
+# Ansible configuration
+semaphore_ansible_host_key_checking: false
+semaphore_ansible_stdout_callback: "default"
+semaphore_git_client: "cmd_git"  # Options: cmd_git, go_git
+
+# Feature flags
+semaphore_password_login_disable: false
+semaphore_non_admin_can_create_project: false
+semaphore_demo_mode: false
+
+# Runner configuration
+semaphore_use_remote_runner: false
+semaphore_runner_api_url: ""
+semaphore_runner_registration_token: ""
+semaphore_runner_config_file: ""
+semaphore_runner_one_off: false
+semaphore_runner_webhook: ""
+semaphore_runner_max_parallel_tasks: 1
+semaphore_runner_job_lifetime: 1440
+
+# System limits
+semaphore_nofile_limit: 65536
+semaphore_nproc_limit: 32768

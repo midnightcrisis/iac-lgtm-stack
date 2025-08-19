@@ -1,0 +1,46 @@
+all:
+  hosts:
+    semaphore-dev:
+      ansible_host: 10.0.1.10  # Replace with your dev server IP
+      ansible_user: ubuntu
+      ansible_ssh_private_key_file: ~/.ssh/id_rsa
+      hostname: dev-semaphore.example.com
+      
+  vars:
+    environment: development
+    
+    # Semaphore configuration
+    semaphore_version: "2.9.37"
+    semaphore_port: 3001
+    semaphore_interface: "0.0.0.0"
+    semaphore_web_host: "http://dev-semaphore.example.com"
+    
+    # Database configuration (using local PostgreSQL)
+    semaphore_db_type: postgres
+    semaphore_db_host: localhost
+    semaphore_db_port: 5432
+    semaphore_db_name: semaphore_dev
+    semaphore_db_user: semaphore_dev
+    semaphore_db_password: "{{ vault_semaphore_db_password }}"
+    semaphore_manage_db: true
+    
+    # Admin configuration
+    semaphore_admin_user: admin
+    semaphore_admin_name: "Dev Admin"
+    semaphore_admin_email: "admin@dev.example.com"
+    semaphore_admin_password: "{{ vault_semaphore_admin_password }}"
+    
+    # Development settings
+    semaphore_max_parallel_tasks: 5
+    semaphore_max_tasks_per_template: 3
+    semaphore_demo_mode: false
+    
+    # Email alerts (disabled for dev)
+    semaphore_email_alert: false
+    
+    # LDAP (disabled for dev)
+    semaphore_ldap_enable: false
+    
+    # Ansible settings
+    semaphore_ansible_host_key_checking: false
+    semaphore_ansible_stdout_callback: "default"

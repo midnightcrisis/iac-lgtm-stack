@@ -1,0 +1,202 @@
+# OpenTelemetry Collector Configuration
+# Managed by Ansible
+
+receivers:
+  # OTLP receiver for traces, metrics, and logs
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:{{ otel_otlp_grpc_port }}
+      http:
+        endpoint: 0.0.0.0:{{ otel_otlp_http_port }}
+        cors:
+          allowed_origins:
+            - "http://*"
+            - "https://*"
+  
+  # Prometheus scraping for metrics
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: 'otel-collector'
+          scrape_interval: 10s
+          static_configs:
+            - targets: ['localhost:8888']
+  
+  # Jaeger receiver for backwards compatibility
+  jaeger:
+    protocols:
+      thrift_http:
+        endpoint: 0.0.0.0:{{ otel_jaeger_thrift_http_port }}
+      grpc:
+        endpoint: 0.0.0.0:{{ otel_jaeger_grpc_port }}
+      thrift_binary:
+        endpoint: 0.0.0.0:{{ otel_jaeger_thrift_binary_port }}
+      thrift_compact:
+        endpoint: 0.0.0.0:{{ otel_jaeger_thrift_compact_port }}
+  
+  # Zipkin receiver for backwards compatibility
+  zipkin:
+    endpoint: 0.0.0.0:{{ otel_zipkin_port }}
+  
+  # Host metrics (CPU, memory, disk, network)
+  hostmetrics:
+    scrapers:
+      cpu:
+      disk:
+      filesystem:
+      load:
+      memory:
+      network:
+      paging:
+      processes:
+    collection_interval: 10s
+  
+  # Kubernetes events (if running in K8s)
+  k8s_events:
+    auth_type: serviceAccount
+    namespaces: {{ monitored_namespaces | to_json }}
+
+processors:
+  # Add resource attributes
+  resource:
+    attributes:
+      - key: environment
+        value: {{ environment }}
+        action: insert
+      - key: service.instance.id
+        from_attribute: host.name
+        action: insert
+      - key: cluster
+        value: {{ gke_cluster_name | default('local') }}
+        action: insert
+  
+  # Batch processor for performance
+  batch:
+    timeout: 10s
+    send_batch_size: 1024
+    send_batch_max_size: 2048
+  
+  # Memory limiter to prevent OOM
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: {{ otel_memory_limit_mib }}
+    spike_limit_mib: {{ otel_spike_limit_mib }}
+  
+  # Span processor for traces
+  span:
+    name:
+      from_attributes: ["service.name", "process.command_line"]
+      separator: ":"
+  
+  # Attributes processor for filtering
+  attributes:
+    actions:
+      - key: http.user_agent
+        action: delete
+      - key: http.request.header.authorization
+        action: delete
+      - key: http.request.header.x-api-key
+        action: delete
+  
+  # Tail sampling for traces
+  tail_sampling:
+    decision_wait: 10s
+    num_traces: 100000
+    expected_new_traces_per_sec: 1000
+    policies:
+      - name: errors-policy
+        type: status_code
+        status_code:
+          status_codes: [ERROR, UNSET]
+      - name: slow-traces-policy
+        type: latency
+        latency:
+          threshold_ms: 1000
+      - name: probabilistic-policy
+        type: probabilistic
+        probabilistic:
+          sampling_percentage: 10
+
+exporters:
+  # Export traces to Tempo
+  otlp/tempo:
+    endpoint: "{{ tempo_endpoint }}"
+    tls:
+      insecure: true
+    headers:
+      X-Scope-OrgID: "{{ tempo_org_id | default('1') }}"
+  
+  # Export metrics to Prometheus/Mimir
+  prometheusremotewrite:
+    endpoint: "{{ prometheus_remote_write_endpoint }}"
+    headers:
+      X-Scope-OrgID: "{{ mimir_org_id | default('1') }}"
+  
+  # Export logs to Loki
+  loki:
+    endpoint: "{{ loki_endpoint }}"
+    labels:
+      attributes:
+        environment: {{ environment }}
+        cluster: {{ gke_cluster_name | default('local') }}
+        namespace: ""
+        pod: ""
+        container: ""
+    
+  # Debug exporter (for troubleshooting)
+  debug:
+    verbosity: detailed
+    sampling_initial: 5
+    sampling_thereafter: 200
+  
+  # OTLP exporter for additional backends
+  otlp/backup:
+    endpoint: "{{ otel_backup_endpoint | default('') }}"
+    tls:
+      insecure: true
+
+extensions:
+  # Health check extension
+  health_check:
+    endpoint: 0.0.0.0:{{ otel_health_port }}
+    path: "/health"
+  
+  # Performance profiler
+  pprof:
+    endpoint: 0.0.0.0:{{ otel_pprof_port }}
+  
+  # Metrics about the collector itself
+  zpages:
+    endpoint: 0.0.0.0:{{ otel_zpages_port }}
+
+service:
+  extensions: [health_check, pprof, zpages]
+  
+  pipelines:
+    # Traces pipeline
+    traces:
+      receivers: [otlp, jaeger, zipkin]
+      processors: [memory_limiter, resource, span, attributes, tail_sampling, batch]
+      exporters: [otlp/tempo{{ ', debug' if otel_debug_mode else '' }}]
+    
+    # Metrics pipeline
+    metrics:
+      receivers: [otlp, prometheus, hostmetrics]
+      processors: [memory_limiter, resource, attributes, batch]
+      exporters: [prometheusremotewrite{{ ', debug' if otel_debug_mode else '' }}]
+    
+    # Logs pipeline
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, resource, attributes, batch]
+      exporters: [loki{{ ', debug' if otel_debug_mode else '' }}]
+  
+  telemetry:
+    logs:
+      level: {{ otel_log_level | default('info') }}
+      development: false
+      encoding: json
+    metrics:
+      level: detailed
+      address: 0.0.0.0:8888

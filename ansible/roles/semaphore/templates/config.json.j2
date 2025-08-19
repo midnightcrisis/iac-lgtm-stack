@@ -1,0 +1,75 @@
+{
+  "mysql": {
+    "host": "{{ semaphore_db_host }}:{{ semaphore_db_port }}",
+    "user": "{{ semaphore_db_user }}",
+    "pass": "{{ semaphore_db_password }}",
+    "name": "{{ semaphore_db_name }}",
+    "options": {{ semaphore_db_options | default({}) | to_json }}
+  },
+  "bolt": {
+    "host": "{{ semaphore_home }}/data/database.boltdb"
+  },
+  "postgres": {
+    "host": "{{ semaphore_db_host }}",
+    "port": "{{ semaphore_db_port }}",
+    "user": "{{ semaphore_db_user }}",
+    "pass": "{{ semaphore_db_password }}",
+    "name": "{{ semaphore_db_name }}",
+    "options": {
+      "sslmode": "{{ semaphore_db_sslmode | default('disable') }}"
+    }
+  },
+  "dialect": "{{ semaphore_db_type }}",
+  "port": "{{ semaphore_port }}",
+  "interface": "{{ semaphore_interface }}",
+  "tmp_path": "{{ semaphore_home }}/tmp",
+  "cookie_hash": "{{ semaphore_cookie_hash | default(lookup('password', '/dev/null chars=ascii_letters,digits length=32')) }}",
+  "cookie_encryption": "{{ semaphore_cookie_encryption | default(lookup('password', '/dev/null chars=ascii_letters,digits length=32')) }}",
+  "access_key_encryption": "{{ semaphore_access_key_encryption | default(lookup('password', '/dev/null chars=ascii_letters,digits length=32')) }}",
+  "email_sender": "{{ semaphore_email_sender | default('semaphore@' + ansible_fqdn) }}",
+  "email_host": "{{ semaphore_email_host | default('') }}",
+  "email_port": "{{ semaphore_email_port | default('') }}",
+  "email_username": "{{ semaphore_email_username | default('') }}",
+  "email_password": "{{ semaphore_email_password | default('') }}",
+  "email_secure": {{ semaphore_email_secure | default(false) | lower }},
+  "email_alert": {{ semaphore_email_alert | default(false) | lower }},
+  "telegram_chat": "{{ semaphore_telegram_chat | default('') }}",
+  "telegram_token": "{{ semaphore_telegram_token | default('') }}",
+  "telegram_alert": {{ semaphore_telegram_alert | default(false) | lower }},
+  "slack_url": "{{ semaphore_slack_url | default('') }}",
+  "slack_alert": {{ semaphore_slack_alert | default(false) | lower }},
+  "ldap_enable": {{ semaphore_ldap_enable | default(false) | lower }},
+  "ldap_binddn": "{{ semaphore_ldap_binddn | default('') }}",
+  "ldap_bindpassword": "{{ semaphore_ldap_bindpassword | default('') }}",
+  "ldap_server": "{{ semaphore_ldap_server | default('') }}",
+  "ldap_searchdn": "{{ semaphore_ldap_searchdn | default('') }}",
+  "ldap_searchfilter": "{{ semaphore_ldap_searchfilter | default('(&(objectClass=person)(uid=%s))') }}",
+  "ldap_mappings": {
+    "dn": "{{ semaphore_ldap_mapping_dn | default('dn') }}",
+    "mail": "{{ semaphore_ldap_mapping_mail | default('mail') }}",
+    "uid": "{{ semaphore_ldap_mapping_uid | default('uid') }}",
+    "cn": "{{ semaphore_ldap_mapping_cn | default('cn') }}"
+  },
+  "ldap_needtls": {{ semaphore_ldap_needtls | default(false) | lower }},
+  "ssh_config_path": "{{ semaphore_ssh_config_path | default(semaphore_home + '/.ssh/config') }}",
+  "git_client": "{{ semaphore_git_client | default('cmd_git') }}",
+  "web_host": "{{ semaphore_web_host | default('') }}",
+  "max_parallel_tasks": {{ semaphore_max_parallel_tasks | default(10) }},
+  "max_tasks_per_template": {{ semaphore_max_tasks_per_template | default(5) }},
+  "password_login_disable": {{ semaphore_password_login_disable | default(false) | lower }},
+  "non_admin_can_create_project": {{ semaphore_non_admin_can_create_project | default(false) | lower }},
+  "use_remote_runner": {{ semaphore_use_remote_runner | default(false) | lower }},
+  "runner": {
+    "api_url": "{{ semaphore_runner_api_url | default('') }}",
+    "registration_token": "{{ semaphore_runner_registration_token | default('') }}",
+    "config_file": "{{ semaphore_runner_config_file | default(semaphore_home + '/config/runner.json') }}",
+    "one_off": {{ semaphore_runner_one_off | default(false) | lower }},
+    "webhook": "{{ semaphore_runner_webhook | default('') }}",
+    "max_parallel_tasks": {{ semaphore_runner_max_parallel_tasks | default(1) }},
+    "job_lifetime": {{ semaphore_runner_job_lifetime | default(1440) }}
+  },
+  "demo": {{ semaphore_demo_mode | default(false) | lower }},
+  "concurrency_mode": "{{ semaphore_concurrency_mode | default('project') }}",
+  "ansible_host_key_checking": {{ semaphore_ansible_host_key_checking | default(false) | lower }},
+  "ansible_stdout_callback": "{{ semaphore_ansible_stdout_callback | default('default') }}"
+}

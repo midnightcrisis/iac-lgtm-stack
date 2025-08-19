@@ -1,0 +1,47 @@
+---
+- name: Install PostgreSQL client
+  apt:
+    name:
+      - postgresql-client
+      - python3-psycopg2
+    state: present
+
+- name: Create Semaphore database
+  postgresql_db:
+    name: "{{ semaphore_db_name }}"
+    encoding: UTF-8
+    lc_collate: en_US.UTF-8
+    lc_ctype: en_US.UTF-8
+    template: template0
+    login_host: "{{ semaphore_db_host }}"
+    login_port: "{{ semaphore_db_port }}"
+    login_user: "{{ semaphore_db_admin_user | default('postgres') }}"
+    login_password: "{{ semaphore_db_admin_password | default(omit) }}"
+    state: present
+  when: semaphore_db_host == 'localhost' or semaphore_db_host == '127.0.0.1'
+
+- name: Create Semaphore database user
+  postgresql_user:
+    name: "{{ semaphore_db_user }}"
+    password: "{{ semaphore_db_password }}"
+    db: "{{ semaphore_db_name }}"
+    priv: ALL
+    login_host: "{{ semaphore_db_host }}"
+    login_port: "{{ semaphore_db_port }}"
+    login_user: "{{ semaphore_db_admin_user | default('postgres') }}"
+    login_password: "{{ semaphore_db_admin_password | default(omit) }}"
+    state: present
+  when: semaphore_db_host == 'localhost' or semaphore_db_host == '127.0.0.1'
+
+- name: Grant all privileges to Semaphore user
+  postgresql_privs:
+    database: "{{ semaphore_db_name }}"
+    privs: ALL
+    type: database
+    role: "{{ semaphore_db_user }}"
+    login_host: "{{ semaphore_db_host }}"
+    login_port: "{{ semaphore_db_port }}"
+    login_user: "{{ semaphore_db_admin_user | default('postgres') }}"
+    login_password: "{{ semaphore_db_admin_password | default(omit) }}"
+    state: present
+  when: semaphore_db_host == 'localhost' or semaphore_db_host == '127.0.0.1'

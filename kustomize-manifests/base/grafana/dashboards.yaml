@@ -1,0 +1,105 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards
+  namespace: monitoring
+data:
+  kubernetes-cluster.json: |
+    {
+      "dashboard": {
+        "title": "Kubernetes Cluster Overview",
+        "panels": [
+          {
+            "title": "CPU Usage",
+            "targets": [
+              {
+                "expr": "sum(rate(container_cpu_usage_seconds_total[5m])) by (namespace)",
+                "legendFormat": "{{namespace}}"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+          },
+          {
+            "title": "Memory Usage",
+            "targets": [
+              {
+                "expr": "sum(container_memory_working_set_bytes) by (namespace)",
+                "legendFormat": "{{namespace}}"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+          },
+          {
+            "title": "Pod Count",
+            "targets": [
+              {
+                "expr": "count(kube_pod_info) by (namespace)",
+                "legendFormat": "{{namespace}}"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+          },
+          {
+            "title": "Network I/O",
+            "targets": [
+              {
+                "expr": "sum(rate(container_network_receive_bytes_total[5m])) by (namespace)",
+                "legendFormat": "RX {{namespace}}"
+              },
+              {
+                "expr": "sum(rate(container_network_transmit_bytes_total[5m])) by (namespace)",
+                "legendFormat": "TX {{namespace}}"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+          }
+        ],
+        "refresh": "30s",
+        "time": {"from": "now-1h", "to": "now"},
+        "uid": "kubernetes-cluster",
+        "version": 1
+      }
+    }
+  
+  application-metrics.json: |
+    {
+      "dashboard": {
+        "title": "Application Metrics (RED)",
+        "panels": [
+          {
+            "title": "Request Rate",
+            "targets": [
+              {
+                "expr": "sum(rate(http_requests_total[5m])) by (service, namespace)",
+                "legendFormat": "{{namespace}}/{{service}}"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 8, "x": 0, "y": 0}
+          },
+          {
+            "title": "Error Rate",
+            "targets": [
+              {
+                "expr": "sum(rate(http_requests_total{status=~\"5..\"}[5m])) by (service, namespace)",
+                "legendFormat": "{{namespace}}/{{service}}"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 8, "x": 8, "y": 0}
+          },
+          {
+            "title": "Request Duration (p95)",
+            "targets": [
+              {
+                "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (service, namespace, le))",
+                "legendFormat": "{{namespace}}/{{service}}"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 8, "x": 16, "y": 0}
+          }
+        ],
+        "refresh": "30s",
+        "time": {"from": "now-1h", "to": "now"},
+        "uid": "application-red",
+        "version": 1
+      }
+    }

@@ -1,0 +1,45 @@
+---
+# OpenTelemetry Collector version
+otel_version: "0.91.0"
+
+# OpenTelemetry base directory
+otel_base_dir: "{{ lgtm_base_dir }}/otel"
+
+# OTLP ports
+otel_otlp_grpc_port: 4317
+otel_otlp_http_port: 4318
+
+# Jaeger ports
+otel_jaeger_thrift_http_port: 14268
+otel_jaeger_grpc_port: 14250
+otel_jaeger_thrift_binary_port: 6831
+otel_jaeger_thrift_compact_port: 6832
+
+# Zipkin port
+otel_zipkin_port: 9411
+
+# Health and monitoring ports
+otel_health_port: 13133
+otel_zpages_port: 55679
+otel_pprof_port: 1777
+
+# Memory limits
+otel_memory_limit_mib: 512
+otel_spike_limit_mib: 128
+
+# Backend endpoints
+tempo_endpoint: "localhost:{{ tempo_otlp_grpc_port | default('4317') }}"
+prometheus_remote_write_endpoint: "http://localhost:{{ prometheus_port }}/api/v1/write"
+loki_endpoint: "http://localhost:{{ loki_port }}/loki/api/v1/push"
+mimir_endpoint: "http://localhost:{{ mimir_port }}/api/v1/push"
+
+# Organization IDs
+tempo_org_id: "1"
+mimir_org_id: "1"
+
+# Debug mode
+otel_debug_mode: false
+otel_log_level: "info"
+
+# Backup endpoint (optional)
+otel_backup_endpoint: ""
