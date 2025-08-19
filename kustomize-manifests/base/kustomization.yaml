@@ -13,34 +13,28 @@ resources:
   - grafana/configmap.yaml
   - grafana/pvc.yaml
   - grafana/ingress.yaml
+  - grafana/dashboards.yaml
   
   # Loki
   - loki/statefulset.yaml
   - loki/service.yaml
   - loki/configmap.yaml
   
-  # Tempo
-  - tempo/statefulset.yaml
-  - tempo/service.yaml
-  - tempo/configmap.yaml
-  
-  # Mimir
-  - mimir/statefulset.yaml
-  - mimir/service.yaml
-  - mimir/configmap.yaml
-  
   # Prometheus
   - prometheus/deployment.yaml
-  - prometheus/service.yaml
   - prometheus/configmap.yaml
-  - prometheus/pvc.yaml
-  - prometheus/clusterrole.yaml
-  - prometheus/clusterrolebinding.yaml
-  - prometheus/serviceaccount.yaml
   
-  # Monitoring configs
-  - monitoring/servicemonitors.yaml
-  - monitoring/podmonitors.yaml
+  # OpenTelemetry
+  - opentelemetry/configmap.yaml
+  - opentelemetry/daemonset.yaml
+  
+  # Promtail (Log collector)
+  - promtail/configmap.yaml
+  - promtail/daemonset.yaml
+  - promtail/service.yaml
+  - promtail/serviceaccount.yaml
+  - promtail/clusterrole.yaml
+  - promtail/clusterrolebinding.yaml
 
 commonLabels:
   app.kubernetes.io/part-of: lgtm-stack

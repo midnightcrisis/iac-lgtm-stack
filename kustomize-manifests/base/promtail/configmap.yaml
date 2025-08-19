@@ -1,0 +1,118 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: promtail-config
+  namespace: monitoring
+data:
+  promtail.yaml: |
+    server:
+      http_listen_port: 3101
+      grpc_listen_port: 0
+      log_level: info
+
+    positions:
+      filename: /run/promtail/positions.yaml
+
+    clients:
+      # Update this URL to point to your Loki instance
+      # If Loki is in the same cluster, use the service name
+      - url: http://loki:3100/loki/api/v1/push
+        tenant_id: fake
+
+    scrape_configs:
+    # Scrape config for pod logs
+    - job_name: kubernetes-pods
+      pipeline_stages:
+        - docker: {}
+        - kubernetes:
+            namespace_name: true
+            pod_name: true
+            container_name: true
+            labels:
+              app: true
+              component: true
+              release: true
+              
+      kubernetes_sd_configs:
+        - role: pod
+      relabel_configs:
+        # Only scrape pods with annotation promtail.io/scrape=true
+        - source_labels: [__meta_kubernetes_pod_annotation_promtail_io_scrape]
+          action: keep
+          regex: true
+          
+        # Use pod namespace as job label
+        - source_labels: [__meta_kubernetes_namespace]
+          target_label: namespace
+          
+        # Use pod name as instance label
+        - source_labels: [__meta_kubernetes_pod_name]
+          target_label: instance
+          
+        # Use container name as container label
+        - source_labels: [__meta_kubernetes_pod_container_name]
+          target_label: container
+          
+        # Extract pod labels
+        - action: labelmap
+          regex: __meta_kubernetes_pod_label_(.+)
+          
+        # Set the log path based on the container runtime
+        - source_labels: [__meta_kubernetes_pod_uid, __meta_kubernetes_pod_container_name]
+          target_label: __path__
+          separator: /
+          replacement: /var/log/pods/*$1*/*/*.log
+          
+        # Extract pod node name
+        - source_labels: [__meta_kubernetes_pod_node_name]
+          target_label: node_name
+          
+        # Extract pod host IP
+        - source_labels: [__meta_kubernetes_pod_host_ip]
+          target_label: node_ip
+
+    # Alternative: Scrape all pods without annotation filtering
+    - job_name: kubernetes-pods-all
+      pipeline_stages:
+        - docker: {}
+        - kubernetes:
+            namespace_name: true
+            pod_name: true
+            container_name: true
+            labels:
+              app: true
+              component: true
+              
+      kubernetes_sd_configs:
+        - role: pod
+      relabel_configs:
+        # Drop pods from kube-system and kube-public namespaces
+        - source_labels: [__meta_kubernetes_namespace]
+          action: drop
+          regex: kube-system|kube-public
+          
+        # Use pod namespace as job label
+        - source_labels: [__meta_kubernetes_namespace]
+          target_label: namespace
+          
+        # Use pod name as instance label
+        - source_labels: [__meta_kubernetes_pod_name]
+          target_label: instance
+          
+        # Use container name as container label
+        - source_labels: [__meta_kubernetes_pod_container_name]
+          target_label: container
+          
+        # Extract pod labels
+        - action: labelmap
+          regex: __meta_kubernetes_pod_label_(.+)
+          
+        # Set the log path based on the container runtime
+        - source_labels: [__meta_kubernetes_pod_uid, __meta_kubernetes_pod_container_name]
+          target_label: __path__
+          separator: /
+          replacement: /var/log/pods/*$1*/*/*.log
+          
+        # Extract pod node name
+        - source_labels: [__meta_kubernetes_pod_node_name]
+          target_label: node_name
